@@ -165,13 +165,13 @@ Required Railway variables:
 | Variable | Value |
 | --- | --- |
 | `APP_ORIGIN` | `https://fake-cms-production.up.railway.app` — must exactly match the public URL; Exchange rejects a `redirectUri` mismatch. Do not set `PORT`; Railway injects it. |
-| `BLOCKS_OS_URL` | Publicly reachable Blocks OS origin (e.g. an ngrok/cloudflared tunnel when Blocks runs locally). |
-| `BLOCKS_IAM_URL` | Publicly reachable Blocks IAM origin. |
+| `BLOCKS_OS_URL` | `https://os.seliseblocks.com` |
+| `BLOCKS_IAM_URL` | `https://iam.seliseblocks.com` |
 | `SITE_NAME`, `SUGGESTED_TEMPLATE` | Optional, as in `server/.env.example`. |
 
 Railway-specific behavior and caveats:
 
-- The container must reach Blocks OS and Blocks IAM server-to-server for Exchange and token calls. `localhost` references from the container refer to Railway, not your machine, so tunnel or deploy those services publicly first.
+- The container reaches the public Blocks OS and Blocks IAM deployments at `os.seliseblocks.com` / `iam.seliseblocks.com` server-to-server for Exchange and token calls, so no tunnel is needed for those services.
 - `server/.connection.json` lives in the container filesystem and is **lost on every deploy or restart**; reconnect after each redeploy or mount a volume at `/app/server`.
 - The warnings in section 5 apply fully: the harness has no authentication, so anyone with the URL can view status and trigger calls with the stored credential. Remove the deployment when testing is done.
 
