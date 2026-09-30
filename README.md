@@ -1,5 +1,7 @@
 # Connect a CMS to Blocks OS
 
+> **Try it live:** [https://fake-cms-production.up.railway.app](https://fake-cms-production.up.railway.app) — the deployed harness on Railway. Click **Connect with Blocks** and sign in with your Blocks account. See [Deployed instance (Railway)](#deployed-instance-railway) for configuration and caveats.
+
 This repository is a small, runnable CMS stand-in: a React settings page and a Node/Express backend. It demonstrates how a WordPress plugin, another CMS, or any server-backed application connects a site to **Blocks Localization** through **Blocks OS Connect**. Use it to test the complete browser redirect, credential exchange, and Localization API flow before building a production integration.
 
 The harness is **for local development and testing only**. It has no administrator authentication and stores one credential in a local plaintext file. The [Blocks OS developer guide](../blocks-os/docs/integration-connect.md) describes the server contract; this README shows how to implement and exercise it from the CMS side.
