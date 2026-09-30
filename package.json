@@ -1,0 +1,15 @@
+{
+  "name": "fake-cms-test-harness",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A minimal stand-in CMS (React + a tiny Node backend) used to end-to-end test blocks-os's \"Connect with Blocks\" integration flow. See README.md.",
+  "workspaces": ["server", "client"],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client",
+    "start": "npm run build -w client && npm run start -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
