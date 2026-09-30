@@ -23,6 +23,7 @@ const BLOCKS_OS_URL = requireEnv("BLOCKS_OS_URL");
 const BLOCKS_IAM_URL = requireEnv("BLOCKS_IAM_URL");
 const SITE_NAME = process.env.SITE_NAME || "Fake CMS Test Harness";
 const SUGGESTED_TEMPLATE = process.env.SUGGESTED_TEMPLATE || "";
+const PENDING_TTL_MS = 10 * 60 * 1000;
 
 const app = express();
 app.use(express.json());
@@ -30,8 +31,15 @@ app.use(cookieParser());
 
 // PKCE state per in-flight connect attempt, keyed by a random id kept in an httpOnly cookie.
 // In-memory and fine to lose on restart: a real CMS plugin would use its own short-lived
-// session/transient store for the same purpose (see README, "How this maps to a real plugin").
+// session/transient store for the same purpose (see README, "Integrate step by step").
 const pending = new Map();
+
+function clearExpiredPending() {
+  const now = Date.now();
+  for (const [id, attempt] of pending) {
+    if (now - attempt.createdAt >= PENDING_TTL_MS) pending.delete(id);
+  }
+}
 
 function base64url(buffer) {
   return buffer.toString("base64url");
@@ -56,13 +64,20 @@ function safeJson(text) {
 // and blocks-os/client/app/pages/connect/connect.tsx for the other side of this flow.
 
 app.get("/connect", (req, res) => {
+  clearExpiredPending();
+  if (req.cookies?.cms_session) pending.delete(req.cookies.cms_session);
   const verifier = base64url(crypto.randomBytes(48));
   const challenge = base64url(crypto.createHash("sha256").update(verifier).digest());
   const state = crypto.randomBytes(16).toString("hex");
   const sessionId = crypto.randomUUID();
 
   pending.set(sessionId, { verifier, state, createdAt: Date.now() });
-  res.cookie("cms_session", sessionId, { httpOnly: true, sameSite: "lax" });
+  res.cookie("cms_session", sessionId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: new URL(APP_ORIGIN).protocol === "https:",
+    maxAge: PENDING_TTL_MS,
+  });
 
   const url = new URL("/connect", BLOCKS_OS_URL);
   url.searchParams.set("app", "localization");
@@ -82,18 +97,28 @@ app.get("/callback", async (req, res) => {
   const session = sessionId ? pending.get(sessionId) : null;
 
   const backToApp = (query) => res.redirect(`/${query ? `?${query}` : ""}`);
-
-  if (error) {
+  const clearAttempt = () => {
     if (sessionId) pending.delete(sessionId);
-    return backToApp(`error=${encodeURIComponent(String(error))}`);
+    res.clearCookie("cms_session");
+  };
+
+  if (!session || Date.now() - session.createdAt >= PENDING_TTL_MS) {
+    clearAttempt();
+    return backToApp("error=session_lost_or_expired");
   }
-  if (!session) return backToApp("error=session_lost_or_expired");
-  if (session.state !== state) {
-    pending.delete(sessionId);
+  const returnedState = typeof state === "string" ? state : "";
+  const expectedState = Buffer.from(session.state);
+  const actualState = Buffer.from(returnedState);
+  if (expectedState.length !== actualState.length || !crypto.timingSafeEqual(expectedState, actualState)) {
+    clearAttempt();
     return backToApp("error=state_mismatch");
   }
-  if (!code || !blocksKey) {
-    pending.delete(sessionId);
+  if (error) {
+    clearAttempt();
+    return backToApp(`error=${encodeURIComponent(String(error))}`);
+  }
+  if (typeof code !== "string" || !code || typeof blocksKey !== "string" || !blocksKey) {
+    clearAttempt();
     return backToApp("error=missing_code_or_key");
   }
 
@@ -108,8 +133,7 @@ app.get("/callback", async (req, res) => {
       }),
     });
     const data = await response.json().catch(() => null);
-    pending.delete(sessionId);
-    res.clearCookie("cms_session");
+    clearAttempt();
 
     if (!response.ok || !data?.clientId || !data?.clientSecret) {
       const message = data?.errors ? JSON.stringify(data.errors) : `HTTP ${response.status}`;
@@ -134,7 +158,7 @@ app.get("/callback", async (req, res) => {
 
     return backToApp("connected=1");
   } catch (err) {
-    if (sessionId) pending.delete(sessionId);
+    clearAttempt();
     console.error("Exchange error:", err);
     return backToApp(`error=${encodeURIComponent(`exchange_error:${err.message}`)}`);
   }
@@ -296,10 +320,8 @@ app.get("/api/localization/modules", async (req, res) => {
 });
 
 // Body: { moduleName }. Maps to blocks-localization's SaveModuleRequest ({ itemId?, moduleName });
-// via Module/Save, which needs blocks-localization::module::save. Note: neither integration
-// template grants that permission (see blocks-os/server/seed/integration-templates.json), so on
-// both Read and Full connections this should come back 403 — same boundary-proving purpose as
-// the "delete-collections" test call. Creating modules for real happens in the Localization UI.
+// via Module/Save, which needs blocks-localization::module::save. The current Full template
+// grants it; Read does not (see blocks-os/server/seed/integration-templates.json).
 app.post("/api/localization/modules", async (req, res) => {
   const moduleName = typeof req.body?.moduleName === "string" ? req.body.moduleName.trim() : "";
   if (moduleName.length < 3 || moduleName.length > 100) {

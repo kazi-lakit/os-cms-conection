@@ -86,7 +86,7 @@ Redirect the browser to `${BLOCKS_OS_URL}/connect` with URL-encoded parameters:
 | `site_name` | Optional site label shown to the user; at most 100 characters. |
 | `template` | Optional suggested key, such as `localization-read` or `localization-full`. |
 
-The harness implements this in [`server/index.js`](server/index.js) at `GET /connect`. It uses a random HttpOnly session cookie to find the pending verifier after the browser returns. A production CMS should expire pending attempts and support the number of concurrent site/admin connections it allows.
+The harness implements this in [`server/index.js`](server/index.js) at `GET /connect`. It uses a random HttpOnly session cookie to find the pending verifier after the browser returns and expires attempts after 10 minutes. A production CMS should use its own persistent, per-admin/site transient store and support the number of concurrent connections it allows.
 
 ### Step 3 — Let the user choose in Blocks OS
 
@@ -156,6 +156,25 @@ npm start
 
 Open **http://localhost:8080/** and click **Connect to Blocks Localization**. `npm start` builds the React client and serves it from the same origin as the callback. For frontend development, run `npm run build` once before `npm run dev`, then continue using port 8080 for the full redirect flow. Vite also serves a development UI on port 5175, but with the default `APP_ORIGIN` the callback returns to port 8080; that port needs a built client to display the result.
 
+### Deployed instance (Railway)
+
+A containerized instance of this harness is deployed at **https://fake-cms-production.up.railway.app** from the `Dockerfile` in this repository (multi-stage build: Vite client build, then a Node runtime that serves `client/dist` and the backend on port 8080).
+
+Required Railway variables:
+
+| Variable | Value |
+| --- | --- |
+| `APP_ORIGIN` | `https://fake-cms-production.up.railway.app` — must exactly match the public URL; Exchange rejects a `redirectUri` mismatch. Do not set `PORT`; Railway injects it. |
+| `BLOCKS_OS_URL` | Publicly reachable Blocks OS origin (e.g. an ngrok/cloudflared tunnel when Blocks runs locally). |
+| `BLOCKS_IAM_URL` | Publicly reachable Blocks IAM origin. |
+| `SITE_NAME`, `SUGGESTED_TEMPLATE` | Optional, as in `server/.env.example`. |
+
+Railway-specific behavior and caveats:
+
+- The container must reach Blocks OS and Blocks IAM server-to-server for Exchange and token calls. `localhost` references from the container refer to Railway, not your machine, so tunnel or deploy those services publicly first.
+- `server/.connection.json` lives in the container filesystem and is **lost on every deploy or restart**; reconnect after each redeploy or mount a volume at `/app/server`.
+- The warnings in section 5 apply fully: the harness has no authentication, so anyone with the URL can view status and trigger calls with the stored credential. Remove the deployment when testing is done.
+
 Check the following with both Read and Full connections:
 
 | Test | Read | Full |
@@ -183,6 +202,10 @@ Key harness routes:
 
 The frontend calls only its own backend routes; it never calls Exchange, IAM, or Localization directly. [`server/store.js`](server/store.js) handles the harness's one-connection file persistence, and [`client/src/App.jsx`](client/src/App.jsx) is the test UI.
 
+React renders API text as escaped text rather than injected HTML, and the backend caches IAM access tokens until shortly before their reported expiry. A WordPress plugin must implement its own output escaping and token cache; this harness does not modify the external plugin.
+
+Run the callback regression test with `npm test -w server`. It starts a local-only harness server and checks cancellation state validation and replay handling.
+
 ## 5. Error handling and production considerations
 
 | Situation | CMS behavior |
@@ -201,7 +224,7 @@ The frontend calls only its own backend routes; it never calls Exchange, IAM, or
 
 For production, protect the settings UI and all CMS backend routes with authentication, authorization, and CSRF checks. Use HTTPS, Secure/HttpOnly/SameSite cookies where applicable, short-lived pending attempts, bounded request timeouts, secret-safe logs, and server-side secret storage. Support credential rotation and revocation: deleting a CMS option or calling this harness's local `/api/disconnect` does **not** revoke the Blocks IAM credential. An administrator must disconnect/regenerate it in the Blocks OS Integration page; already-issued access tokens can remain valid until expiry. Never put `clientSecret`, PKCE verifier, or bearer token in a URL, localStorage, HTML, or logs.
 
-**Harness limitations:** `server/.connection.json` contains a live plaintext client secret (and is gitignored); `server/.env` is gitignored too. Pending attempts are in memory and do not have a cleanup timer, and the current callback handler does not verify `state` on the cancellation/error branch. Anyone who can reach this unauthenticated harness can trigger calls using the stored credential. Keep it local, do not deploy it publicly, and disconnect/revoke the test credential when finished. A production callback must validate `state` on **every** return path.
+**Harness limitations:** `server/.connection.json` contains a live plaintext client secret (and is gitignored); `server/.env` is gitignored too. Pending attempts live only in memory and are pruned when a new connection starts, not by a background timer. Anyone who can reach this unauthenticated harness can trigger calls using the stored credential. Keep it local, do not deploy it publicly, and disconnect/revoke the test credential when finished.
 
 ## 6. Conclusion
 

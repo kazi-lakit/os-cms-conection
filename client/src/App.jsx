@@ -345,8 +345,8 @@ function AddKeys({ accessLevel }) {
       {loaded && !loadError && modules.length === 0 && (
         <div className="banner banner-error">
           This environment has no localization modules yet, and every key must belong to one.
-          Integrations can&apos;t create modules (neither template grants module::save), so create
-          one in Blocks Localization for this environment, then reload.{" "}
+          A Full connection can create a module below; a Read connection cannot. Then reload
+          the module list.{" "}
           <button className="btn btn-small" onClick={loadOptions}>
             Reload
           </button>
@@ -433,9 +433,8 @@ function CreateModule({ onCreate, busy, result }) {
         <CubeIcon size={18} /> Create module
       </h2>
       <p className="note" style={{ marginTop: 0, marginBottom: 16 }}>
-        Saves a module through <span className="inline-code">Module/Save</span>. Neither template
-        grants <span className="inline-code">module::save</span>, so expect 403 on both Read and
-        Full — permission is granted in the Localization UI.
+        Saves a module through <span className="inline-code">Module/Save</span>. The Full template
+        grants <span className="inline-code">module::save</span>; Read should return 403.
       </p>
       <form className="module-form" onSubmit={submit}>
         <input
