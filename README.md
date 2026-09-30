@@ -31,22 +31,22 @@ sequenceDiagram
 
     User->>Browser: Click Connect to Blocks OS
     Browser->>CMS: GET /connect
-    CMS->>CMS: Generate state + PKCE verifier; store temporarily
+    CMS->>CMS: Generate state + PKCE verifier, store temporarily
     CMS-->>Browser: Redirect to Blocks OS /connect (state + challenge)
     Browser->>OS: Open /connect
-    User->>OS: Sign in; choose project, environment, access; Connect
+    User->>OS: Sign in, choose project, environment, access, Connect
     OS-->>Browser: Redirect to CMS callback (code, state, blocks_key)
     Browser->>CMS: GET /callback
-    CMS->>CMS: Validate state; load verifier
+    CMS->>CMS: Validate state, load verifier
     CMS->>OS: POST /api/Integration/Exchange (code + verifier)
     OS-->>CMS: Client ID, secret, environment key, API metadata
-    CMS->>CMS: Store credential server-side; clear pending attempt
+    CMS->>CMS: Store credential server-side, clear pending attempt
     CMS-->>Browser: Show connected status
     CMS->>IAM: POST /api/oidc/token (client_credentials)
     IAM-->>CMS: Access token + expiry
     CMS->>L10n: API request (Bearer token + environment X-Blocks-Key)
     L10n-->>CMS: Localization response
-    CMS-->>Browser: Safe result; never send the secret
+    CMS-->>Browser: Safe result, never send the secret
 ```
 
 There are **two different Blocks keys** in this flow. The successful callback's `blocks_key` is used as the `X-Blocks-Key` header for the one-time **Exchange** call. The Exchange response's `xBlocksKey` identifies the selected environment and is used for subsequent **IAM token and Localization API** calls. Do not substitute one for the other.
