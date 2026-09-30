@@ -1,6 +1,6 @@
 # Connect a CMS to Blocks OS
 
-> **Try it live:** [https://fake-cms-production.up.railway.app](https://fake-cms-production.up.railway.app) — the deployed harness on Railway. Click **Connect with Blocks** and sign in with your Blocks account. See [Deployed instance (Railway)](#deployed-instance-railway) for configuration and caveats.
+> **Try it live:** [https://os-cms-conection-production.up.railway.app](https://os-cms-conection-production.up.railway.app) — the deployed harness on Railway. Click **Connect with Blocks** and sign in with your Blocks account. See [Deployed instance (Railway)](#deployed-instance-railway) for configuration and caveats.
 
 This repository is a small, runnable CMS stand-in: a React settings page and a Node/Express backend. It demonstrates how a WordPress plugin, another CMS, or any server-backed application connects a site to **Blocks Localization** through **Blocks OS Connect**. Use it to test the complete browser redirect, credential exchange, and Localization API flow before building a production integration.
 
@@ -160,13 +160,13 @@ Open **http://localhost:8080/** and click **Connect to Blocks Localization**. `n
 
 ### Deployed instance (Railway)
 
-A containerized instance of this harness is deployed at **https://fake-cms-production.up.railway.app** from the `Dockerfile` in this repository (multi-stage build: Vite client build, then a Node runtime that serves `client/dist` and the backend on port 8080).
+A containerized instance of this harness is deployed at **https://os-cms-conection-production.up.railway.app** from the `Dockerfile` in this repository (multi-stage build: Vite client build, then a Node runtime that serves `client/dist` and the backend on port 8080).
 
 Required Railway variables:
 
 | Variable | Value |
 | --- | --- |
-| `APP_ORIGIN` | `https://fake-cms-production.up.railway.app` — must exactly match the public URL; Exchange rejects a `redirectUri` mismatch. Do not set `PORT`; Railway injects it. |
+| `APP_ORIGIN` | `https://os-cms-conection-production.up.railway.app` — must exactly match the public URL; Exchange rejects a `redirectUri` mismatch. Do not set `PORT`; Railway injects it. |
 | `BLOCKS_OS_URL` | `https://os.seliseblocks.com` |
 | `BLOCKS_IAM_URL` | `https://iam.seliseblocks.com` |
 | `SITE_NAME`, `SUGGESTED_TEMPLATE` | Optional, as in `server/.env.example`. |
