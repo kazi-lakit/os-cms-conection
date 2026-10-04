@@ -8,7 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // multi-tenant CMS. It deliberately mirrors what a real plugin does at a much smaller scale —
 // one WordPress site, one stored connection, kept server-side only. Restarting the server does
 // NOT lose the connection (unlike the in-memory PKCE map in index.js, which is fine to lose).
-const STORE_PATH = path.join(__dirname, ".connection.json");
+// CONNECTION_STORE_PATH lets tests use a temp file instead of overwriting the real connection.
+const STORE_PATH = process.env.CONNECTION_STORE_PATH || path.join(__dirname, ".connection.json");
 
 export function readConnection() {
   try {

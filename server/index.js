@@ -122,6 +122,17 @@ app.get("/callback", async (req, res) => {
     return backToApp("error=missing_code_or_key");
   }
 
+  // A browser can load the same callback twice, for example when a "Go to site now" click races
+  // the connect page's auto-redirect. The one-time code can only be redeemed once, so the first
+  // request does the exchange and any duplicate waits for that same result instead of failing
+  // with invalid_code. The finished attempt stays in `pending` until the TTL sweep removes it.
+  if (!session.exchange) session.exchange = exchangeCode(session, code, blocksKey);
+  const outcome = await session.exchange;
+  res.clearCookie("cms_session");
+  return backToApp(outcome);
+});
+
+async function exchangeCode(session, code, blocksKey) {
   try {
     const response = await fetch(`${BLOCKS_OS_URL}/api/Integration/Exchange`, {
       method: "POST",
@@ -133,12 +144,11 @@ app.get("/callback", async (req, res) => {
       }),
     });
     const data = await response.json().catch(() => null);
-    clearAttempt();
 
     if (!response.ok || !data?.clientId || !data?.clientSecret) {
       const message = data?.errors ? JSON.stringify(data.errors) : `HTTP ${response.status}`;
       console.error("Exchange failed:", message);
-      return backToApp(`error=${encodeURIComponent(`exchange_failed:${message}`)}`);
+      return `error=${encodeURIComponent(`exchange_failed:${message}`)}`;
     }
 
     // The secret is kept here, server-side, and never sent back to the browser. This is the
@@ -155,14 +165,12 @@ app.get("/callback", async (req, res) => {
       connectedAt: new Date().toISOString(),
     });
     tokenCache = null;
-
-    return backToApp("connected=1");
+    return "connected=1";
   } catch (err) {
-    clearAttempt();
     console.error("Exchange error:", err);
-    return backToApp(`error=${encodeURIComponent(`exchange_error:${err.message}`)}`);
+    return `error=${encodeURIComponent(`exchange_error:${err.message}`)}`;
   }
-});
+}
 
 // ───────────────────────── API for the React frontend ─────────────────────────
 // Never returns the raw client secret — only a masked preview. The frontend has no other way
